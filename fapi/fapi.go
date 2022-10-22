@@ -15,6 +15,7 @@
 package fapi
 
 import (
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -22,17 +23,56 @@ import (
 	"net/http"
 	"strconv"
 	"time"
+
+	_ "github.com/go-sql-driver/mysql"
 )
 
-var client = &http.Client{Timeout: time.Minute}
+// Binance API.
+var api struct {
+
+	// MySql data base.
+	db *sql.DB
+
+	// HTTP client for all request to Binance API.
+	client *http.Client
+
+	// Binance API key.
+	key string
+}
+
+// Initialize default values for connect API, prepare and ping connect to database.
+func Init(key, user, password, address, database string) {
+
+	db, err := sql.Open("mysql",
+		fmt.Sprintf(
+			"%s:%s@tcp(%s)/%s?allowNativePasswords=false&checkConnLiveness=false&maxAllowedPacket=0",
+			user,
+			password,
+			address,
+			database))
+
+	if err != nil {
+		log.Fatalf("Error %s when open mysql database.", err)
+	}
+
+	if e := db.Ping(); e != nil {
+		log.Fatalf("Error %s when ping to MySql database.", e)
+	}
+
+	api.db = db
+
+	api.key = key
+	api.client = &http.Client{Timeout: time.Minute}
+
+}
 
 // Universal getting json from Binance perpetual future API.
-func requestEndpoint(key, endpoint string, queries *map[string]string, response any) (time.Time, int64) {
+func requestEndpoint(endpoint string, queries *map[string]string, response any) (time.Time, int64) {
 
 	// Create request.
 	req, err := http.NewRequest("GET", fmt.Sprintf("https://fapi.binance.com/fapi/v1/%s", endpoint), nil)
 	if err != nil {
-		log.Fatalf("Error %s when create new request", err)
+		log.Fatalf("Error %s when create new request.", err)
 	}
 
 	// Adding queries.
@@ -49,53 +89,55 @@ func requestEndpoint(key, endpoint string, queries *map[string]string, response 
 
 	// Adding headers.
 	req.Header.Add("Content-Type", "application/json")
-	req.Header.Add("X-MBX-APIKEY", key)
+	req.Header.Add("X-MBX-APIKEY", api.key)
 
 	// Execute request.
-	res, err := client.Do(req)
+	res, err := api.client.Do(req)
 	if err != nil {
-		log.Fatalf("Error %s when execute request", err)
+		log.Fatalf("Error %s when execute request.", err)
 	}
 	defer res.Body.Close()
 
-	// Detect ban.
-	if res.StatusCode == 429 || res.StatusCode == 418 {
-		log.Fatalf("Error status code %d", res.StatusCode)
+	// Detect status сode.
+	if res.StatusCode != 200 {
+		log.Fatalf("Error status %d code.", res.StatusCode)
+	} else if res.StatusCode == 429 || res.StatusCode == 418 {
+		log.Fatalf("Error status code %d this request is banned.", res.StatusCode)
 	}
 
 	// Detect content type.
 	if res.Header.Get("Content-Type") != "application/json" {
-		log.Fatalln("The request returned an unexpected content type")
+		log.Fatalln("Error the request returned an unexpected content type.")
 	}
 
 	// Server response time.
 	dat, err := time.Parse(time.RFC1123, res.Header.Get("Date"))
 	if err != nil {
-		log.Fatalf("error %s when parse response header date", err)
+		log.Fatalf("Error %s when parse response header date.", err)
 	}
 
 	// Weight responce.
 	weg, err := strconv.ParseInt(res.Header.Get("X-MBX-USED-WEIGHT-1M"), 10, 64)
 	if err != nil {
-		log.Fatalf("error %s when getting weight", err)
+		log.Fatalf("Error %s when getting weight.", err)
 	}
 
 	// Body from response.
 	body, err := io.ReadAll(res.Body)
 	if err != nil {
-		log.Fatalf("error %s when read body request", err)
+		log.Fatalf("Error %s when read body request.", err)
 	}
 
 	// Parse json.
 	if err := json.Unmarshal(body, response); err != nil {
-		log.Fatalf("error %s when getting trades and json marshal", err)
+		log.Fatalf("Error %s when getting trades and json marshal.", err)
 	}
 
 	return dat, weg
 }
 
 // Returns trades, server response time and weight 1m
-func getHistoricalTrades(key, symbol string, fromId int64) ([]Trade, time.Time, int64) {
+func getHistoricalTrades(symbol string, fromId int64) ([]Trade, time.Time, int64) {
 
 	// Transactions from API responce.
 	var jtr []struct {
@@ -118,7 +160,7 @@ func getHistoricalTrades(key, symbol string, fromId int64) ([]Trade, time.Time, 
 	}
 
 	// Request historical trades.
-	dat, weg := requestEndpoint(key, "historicalTrades", &que, &jtr)
+	dat, weg := requestEndpoint("historicalTrades", &que, &jtr)
 
 	// Fields type conversion.
 	for _, t := range jtr {
@@ -133,21 +175,21 @@ func getHistoricalTrades(key, symbol string, fromId int64) ([]Trade, time.Time, 
 		if f, e := strconv.ParseFloat(t.Price, 64); e == nil {
 			trade.Price = f
 		} else {
-			log.Fatalf("error %s when convert type price", e)
+			log.Fatalf("Error %s when convert type price.", e)
 		}
 
 		// Qty convert string to float.
 		if f, e := strconv.ParseFloat(t.Qty, 64); e == nil {
 			trade.Qty = f
 		} else {
-			log.Fatalf("error %s when convert type qty", e)
+			log.Fatalf("Error %s when convert type qty.", e)
 		}
 
 		// Quote qty convert string to float.
 		if f, e := strconv.ParseFloat(t.QuoteQty, 64); e == nil {
 			trade.QuoteQty = f
 		} else {
-			log.Fatalf("error %s when convert type quote qty", e)
+			log.Fatalf("Error %s when convert type quote qty.", e)
 		}
 
 		tra = append(tra, trade)
