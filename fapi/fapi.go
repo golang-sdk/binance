@@ -43,27 +43,26 @@ var api struct {
 // Initialize default values for connect API, prepare and ping connect to database.
 func Init(key, user, password, address, database string) {
 
-	db, err := sql.Open("mysql",
+	api.key = key
+	api.client = &http.Client{Timeout: time.Minute}
+
+	if db, err := sql.Open("mysql",
 		fmt.Sprintf(
 			"%s:%s@tcp(%s)/%s?allowNativePasswords=false&checkConnLiveness=false&maxAllowedPacket=0",
 			user,
 			password,
 			address,
-			database))
+			database)); err == nil {
 
-	if err != nil {
+		api.db = db
+
+	} else {
 		log.Fatalf("Error %s when open mysql database.", err)
 	}
 
-	if e := db.Ping(); e != nil {
+	if e := api.db.Ping(); e != nil {
 		log.Fatalf("Error %s when ping to MySql database.", e)
 	}
-
-	api.db = db
-
-	api.key = key
-	api.client = &http.Client{Timeout: time.Minute}
-
 }
 
 // Universal getting json from Binance perpetual future API.
