@@ -31,7 +31,7 @@ import (
 var api struct {
 
 	// MySql data base.
-	db *sql.DB
+	database *sql.DB
 
 	// HTTP client for all request to Binance API.
 	client *http.Client
@@ -54,13 +54,13 @@ func Init(key, user, password, address, database string) {
 			address,
 			database)); err == nil {
 
-		api.db = db
+		api.database = db
 
 	} else {
 		log.Fatalf("Error %s when open mysql database.", err)
 	}
 
-	if e := api.db.Ping(); e != nil {
+	if e := api.database.Ping(); e != nil {
 		log.Fatalf("Error %s when ping to MySql database.", e)
 	}
 }
