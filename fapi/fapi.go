@@ -38,6 +38,19 @@ var api struct {
 
 	// Binance API key.
 	key string
+
+	// Used weight.
+	weight struct {
+
+		// Time last response from the API server.
+		last time.Time
+
+		// Maximum allowable weight.
+		maximum uint16
+
+		// Count used weight.
+		used uint16
+	}
 }
 
 // Initialize default values for connect API, prepare and ping connect to database.
@@ -46,27 +59,44 @@ func Init(key, user, password, address, database string) {
 	api.key = key
 	api.client = &http.Client{Timeout: time.Minute}
 
-	if db, err := sql.Open("mysql",
+	api.weight.last = time.Now().UTC()
+	api.weight.maximum = 120
+
+	if d, e := sql.Open("mysql",
 		fmt.Sprintf(
 			"%s:%s@tcp(%s)/%s?allowNativePasswords=false&checkConnLiveness=false&maxAllowedPacket=0",
 			user,
 			password,
 			address,
-			database)); err == nil {
+			database)); e == nil {
 
-		api.database = db
+		api.database = d
 
 	} else {
-		log.Fatalf("Error %s when open mysql database.", err)
+		log.Fatalf("Error %s when open mysql database.", e)
 	}
 
-	if err := api.database.Ping(); err != nil {
-		log.Fatalf("Error %s when ping to MySql database.", err)
+	if e := api.database.Ping(); e != nil {
+		log.Fatalf("Error %s when ping to MySql database.", e)
 	}
 }
 
 // Universal getting json from Binance perpetual future API.
-func requestEndpoint(endpoint string, queries *map[string]string, response any) (time.Time, int64) {
+func requestEndpoint(endpoint string, queries *map[string]string, response any) {
+
+	// Control used weight.
+	if api.weight.used >= api.weight.maximum {
+
+		time.Sleep(time.Now().
+			UTC().
+			Truncate(time.Minute).
+			Add(time.Minute).
+			Sub(api.weight.last))
+
+	} else if api.weight.used > 0 {
+
+		time.Sleep(time.Second)
+	}
 
 	// Create request.
 	req, err := http.NewRequest("GET", fmt.Sprintf("https://fapi.binance.com/fapi/v1/%s", endpoint), nil)
@@ -110,15 +140,17 @@ func requestEndpoint(endpoint string, queries *map[string]string, response any) 
 	}
 
 	// Server response time.
-	dat, err := time.Parse(time.RFC1123, res.Header.Get("Date"))
-	if err != nil {
-		log.Fatalf("Error %s when parse response header date.", err)
+	if t, e := time.Parse(time.RFC1123, res.Header.Get("Date")); e == nil {
+		api.weight.last = t
+	} else {
+		log.Fatalf("Error %s when parse response header date.", e)
 	}
 
 	// Weight responce.
-	weg, err := strconv.ParseInt(res.Header.Get("X-MBX-USED-WEIGHT-1M"), 10, 64)
-	if err != nil {
-		log.Fatalf("Error %s when getting weight.", err)
+	if w, e := strconv.ParseUint(res.Header.Get("X-MBX-USED-WEIGHT-1M"), 10, 16); e == nil {
+		api.weight.used = uint16(w)
+	} else {
+		log.Fatalf("Error %s when getting weight.", e)
 	}
 
 	// Body from response.
@@ -128,15 +160,13 @@ func requestEndpoint(endpoint string, queries *map[string]string, response any) 
 	}
 
 	// Parse json.
-	if err := json.Unmarshal(body, response); err != nil {
-		log.Fatalf("Error %s when getting trades and json marshal.", err)
+	if e := json.Unmarshal(body, response); e != nil {
+		log.Fatalf("Error %s when getting trades and json marshal.", e)
 	}
-
-	return dat, weg
 }
 
 // Returns trades, server response time and weight 1m
-func getHistoricalTrades(symbol string, fromId int64) ([]Trade, time.Time, int64) {
+func getHistoricalTrades(symbol string, fromId int64) []Trade {
 
 	// Transactions from API responce.
 	var jtr []struct {
@@ -159,7 +189,7 @@ func getHistoricalTrades(symbol string, fromId int64) ([]Trade, time.Time, int64
 	}
 
 	// Request historical trades.
-	dat, weg := requestEndpoint("historicalTrades", &que, &jtr)
+	requestEndpoint("historicalTrades", &que, &jtr)
 
 	// Fields type conversion.
 	for _, t := range jtr {
@@ -194,5 +224,5 @@ func getHistoricalTrades(symbol string, fromId int64) ([]Trade, time.Time, int64
 		tra = append(tra, trade)
 	}
 
-	return tra, dat, weg
+	return tra
 }
