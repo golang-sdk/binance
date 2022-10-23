@@ -60,8 +60,8 @@ func Init(key, user, password, address, database string) {
 		log.Fatalf("Error %s when open mysql database.", err)
 	}
 
-	if e := api.database.Ping(); e != nil {
-		log.Fatalf("Error %s when ping to MySql database.", e)
+	if err := api.database.Ping(); err != nil {
+		log.Fatalf("Error %s when ping to MySql database.", err)
 	}
 }
 
