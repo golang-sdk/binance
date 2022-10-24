@@ -166,11 +166,11 @@ func requestEndpoint(endpoint string, queries *map[string]string, response any) 
 }
 
 // Returns trades, server response time and weight 1m
-func getHistoricalTrades(symbol string, fromId int64) []Trade {
+func getHistoricalTrades(symbol string, fromId uint64) []Trade {
 
 	// Transactions from API responce.
 	var jtr []struct {
-		ID           int64  `json:"id"`
+		ID           uint64 `json:"id"`
 		Price        string `json:"price"`
 		Qty          string `json:"qty"`
 		QuoteQty     string `json:"quoteQty"`
@@ -185,7 +185,7 @@ func getHistoricalTrades(symbol string, fromId int64) []Trade {
 	que := map[string]string{
 		"symbol": symbol,
 		"limit":  "1000",
-		"fromId": strconv.FormatInt(fromId, 10),
+		"fromId": strconv.FormatUint(fromId, 10),
 	}
 
 	// Request historical trades.

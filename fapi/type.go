@@ -17,7 +17,7 @@ package fapi
 import "time"
 
 type Trade struct {
-	TradeId      int64
+	TradeId      uint64
 	Price        float64
 	Qty          float64
 	QuoteQty     float64
