@@ -166,7 +166,7 @@ func requestEndpoint(endpoint string, queries *map[string]string, response any) 
 }
 
 // Returns trades, server response time and weight 1m
-func getHistoricalTrades(symbol string, fromId uint64) []Trade {
+func getThousandHistoricalTrades(symbol string, fromId uint64) []Trade {
 
 	// Transactions from API responce.
 	var jtr []struct {
