@@ -81,7 +81,7 @@ func Init(key, user, password, address, database string) {
 	}
 }
 
-// Universal getting json from Binance perpetual future API.
+// Json response from Binance perpetual future API.
 func requestEndpoint(endpoint string, queries *map[string]string, response any) {
 
 	// Control used weight.
@@ -165,8 +165,8 @@ func requestEndpoint(endpoint string, queries *map[string]string, response any) 
 	}
 }
 
-// Returns trades, server response time and weight 1m
-func getThousandHistoricalTrades(symbol string, fromId uint64) []Trade {
+// Getted and return slice trades.
+func getSliceHistoricalTrades(symbol string, fromId, limit uint64) []Trade {
 
 	// Transactions from API responce.
 	var jtr []struct {
@@ -184,7 +184,7 @@ func getThousandHistoricalTrades(symbol string, fromId uint64) []Trade {
 	// Queries.
 	que := map[string]string{
 		"symbol": symbol,
-		"limit":  "1000",
+		"limit":  strconv.FormatUint(limit, 10),
 		"fromId": strconv.FormatUint(fromId, 10),
 	}
 
@@ -225,4 +225,27 @@ func getThousandHistoricalTrades(symbol string, fromId uint64) []Trade {
 	}
 
 	return tra
+}
+
+// Getting all historical trades splitted by slices, in one slice conines thousand transactions.
+func getAllHistoricalTrades(symbol string, fromId, limit uint64, slice func(trades []Trade)) {
+
+	for c := true; c; {
+
+		t := getSliceHistoricalTrades(symbol, fromId+1, limit)
+
+		if len(t) > 0 {
+
+			// Call hook.
+			slice(t)
+
+			// if the length is less than the limit, stop the loop.
+			c = len(t) >= int(limit)
+
+			fromId = t[len(t)-1].TradeId
+
+		} else {
+			c = false
+		}
+	}
 }
