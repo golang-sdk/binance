@@ -21,6 +21,7 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"sort"
 	"strconv"
 	"time"
 
@@ -230,22 +231,26 @@ func getSliceHistoricalTrades(symbol string, fromId, limit uint64) []Trade {
 // Getting all historical trades splitted by slices, in one slice conines thousand transactions.
 func getAllHistoricalTrades(symbol string, fromId, limit uint64, slice func(trades []Trade)) {
 
-	for c := true; c; {
+	for t := getSliceHistoricalTrades(symbol, fromId, limit); len(t) >= int(limit); t = getSliceHistoricalTrades(symbol, fromId, limit) {
 
-		t := getSliceHistoricalTrades(symbol, fromId+1, limit)
+		// Sort array by trade id that get last trade id.
+		sort.Slice(t, func(i, j int) bool {
+			return t[i].TradeId < t[j].TradeId
+		})
 
+		// Check trade id sequence for gaps.
+		for i := 0; i < len(t); i++ {
+			if is := i > 0; is && !(t[i-1].TradeId+1 == t[i].TradeId) {
+				log.Fatalln("Gap in the sequence of deals.")
+			}
+		}
+
+		// Call hook.
+		slice(t)
+
+		// Offset from id by the limit.
 		if len(t) > 0 {
-
-			// Call hook.
-			slice(t)
-
-			// if the length is less than the limit, stop the loop.
-			c = len(t) >= int(limit)
-
-			fromId = t[len(t)-1].TradeId
-
-		} else {
-			c = false
+			fromId = t[len(t)-1].TradeId + 1
 		}
 	}
 }
