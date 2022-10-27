@@ -254,3 +254,37 @@ func getAllHistoricalTrades(symbol string, fromId, limit uint64, slice func(trad
 		}
 	}
 }
+
+// Getting and save historical trades.
+func saveHistoricalTrades(symbol string, fromId uint64) {
+
+	// Getting historical trades.
+	getAllHistoricalTrades("BTCUSDT", fromId, 10, func(trades []Trade) {
+
+		q := "INSERT INTO %s (id, time, price, qty, quote_qty, is_buyer_maker) VALUES"
+
+		p := make([]any, 0)
+
+		for i := 0; i < len(trades); i++ {
+
+			p = append(p, trades[i].TradeId)
+			p = append(p, trades[i].Time.Format("2006-01-02 15:04:05.000"))
+			p = append(p, trades[i].Price)
+			p = append(p, trades[i].Qty)
+			p = append(p, trades[i].QuoteQty)
+			p = append(p, trades[i].IsBuyerMaker)
+
+			if i == len(trades)-1 {
+				q += "(?,?,?,?,?,?)"
+			} else {
+				q += "(?,?,?,?,?,?),"
+			}
+		}
+
+		res, err := api.database.Exec(fmt.Sprintf(q, "ft_btcusdt"), p...)
+
+		if err != nil {
+			log.Fatal(err, res)
+		}
+	})
+}
