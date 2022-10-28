@@ -263,7 +263,7 @@ func saveHistoricalTrades(symbol string, fromId uint64) {
 	var lastTime time.Time
 
 	// Getting historical trades.
-	getAllHistoricalTrades("BTCUSDT", fromId, func(trades []Trade) {
+	getAllHistoricalTrades(symbol, fromId, func(trades []Trade) {
 
 		q := "INSERT INTO %s (id, time, price, qty, quote_qty, is_buyer_maker) VALUES"
 
