@@ -256,7 +256,7 @@ func getAllHistoricalTrades(symbol string, fromId uint64, slice func(trades []Tr
 // Getting and save historical trades.
 func saveHistoricalTrades(symbol string, fromId uint64) {
 
-	// Last trade ID of trades.
+	// Last trade ID from list trades.
 	var lastID uint64
 
 	// Last time of trades.
@@ -301,4 +301,30 @@ func saveHistoricalTrades(symbol string, fromId uint64) {
 			log.Fatal(e, r)
 		}
 	})
+}
+
+// Updates transactions in the database from last saved to now.
+func updateHistoricalTrades(symbol string) {
+
+	// Last trade ID from database.
+	var tdi uint64
+
+	// Is it available information of the last save.
+	var is bool
+
+	// Select is it available information of the last save.
+	if e := api.database.QueryRow("SELECT COUNT(*) FROM ft_last_saved WHERE symbol = ?", symbol).Scan(&is); e != nil {
+		log.Fatalln(e)
+	}
+
+	if is {
+		// Select last trade ID from database.
+		if e := api.database.QueryRow("SELECT tid FROM ft_last_saved WHERE symbol = ?", symbol).Scan(&tdi); e != nil {
+			log.Fatalln(e)
+		}
+	} else {
+		tdi = 0
+	}
+
+	saveHistoricalTrades(symbol, tdi+1)
 }
