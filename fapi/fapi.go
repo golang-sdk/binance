@@ -61,7 +61,7 @@ func Init(key, user, password, address, database string) {
 	api.client = &http.Client{Timeout: time.Minute}
 
 	api.weight.last = time.Now().UTC()
-	api.weight.maximum = 120
+	api.weight.maximum = 1200
 
 	if d, e := sql.Open("mysql",
 		fmt.Sprintf(
@@ -167,7 +167,7 @@ func requestEndpoint(endpoint string, queries *map[string]string, response any) 
 }
 
 // Getted and return slice trades.
-func getSliceHistoricalTrades(symbol string, fromId, limit uint64) []Trade {
+func getSliceHistoricalTrades(symbol string, fromId uint64) []Trade {
 
 	// Transactions from API responce.
 	var jtr []struct {
@@ -185,7 +185,7 @@ func getSliceHistoricalTrades(symbol string, fromId, limit uint64) []Trade {
 	// Queries.
 	que := map[string]string{
 		"symbol": symbol,
-		"limit":  strconv.FormatUint(limit, 10),
+		"limit":  "100",
 		"fromId": strconv.FormatUint(fromId, 10),
 	}
 
@@ -229,27 +229,25 @@ func getSliceHistoricalTrades(symbol string, fromId, limit uint64) []Trade {
 }
 
 // Getting all historical trades splitted by slices, in one slice conines thousand transactions.
-func getAllHistoricalTrades(symbol string, fromId, limit uint64, slice func(trades []Trade)) {
+func getAllHistoricalTrades(symbol string, fromId uint64, slice func(trades []Trade)) {
 
-	for t := getSliceHistoricalTrades(symbol, fromId, limit); len(t) >= int(limit); t = getSliceHistoricalTrades(symbol, fromId, limit) {
+	for {
+
+		t := getSliceHistoricalTrades(symbol, fromId)
+
+		log.Println("len", len(t))
 
 		// Sort array by trade id that get last trade id.
 		sort.Slice(t, func(i, j int) bool {
 			return t[i].TradeId < t[j].TradeId
 		})
 
-		// Check trade id sequence for gaps.
-		for i := 0; i < len(t); i++ {
-			if is := i > 0; is && !(t[i-1].TradeId+1 == t[i].TradeId) {
-				log.Fatalln("Gap in the sequence of deals.")
-			}
-		}
-
-		// Call hook.
-		slice(t)
-
-		// Offset from id by the limit.
 		if len(t) > 0 {
+
+			// Call hook.
+			slice(t)
+
+			// Offset from id by the limit.
 			fromId = t[len(t)-1].TradeId + 1
 		}
 	}
@@ -259,7 +257,7 @@ func getAllHistoricalTrades(symbol string, fromId, limit uint64, slice func(trad
 func saveHistoricalTrades(symbol string, fromId uint64) {
 
 	// Getting historical trades.
-	getAllHistoricalTrades("BTCUSDT", fromId, 10, func(trades []Trade) {
+	getAllHistoricalTrades("BTCUSDT", fromId, func(trades []Trade) {
 
 		q := "INSERT INTO %s (id, time, price, qty, quote_qty, is_buyer_maker) VALUES"
 
