@@ -82,6 +82,67 @@ func Init(key, user, password, address, database string) {
 	}
 }
 
+func convertAnyToInt(data any) int64 {
+
+	var r int64
+
+	if b, e := json.Marshal(data); e == nil {
+
+		if e := json.Unmarshal(b, &r); e != nil {
+			log.Fatalln(r)
+		}
+
+	} else {
+		log.Fatal(e)
+	}
+
+	return r
+}
+
+func convertAnyToUint(data any) uint64 {
+
+	var r uint64
+
+	if b, e := json.Marshal(data); e == nil {
+
+		if e := json.Unmarshal(b, &r); e != nil {
+			log.Fatalln(r)
+		}
+
+	} else {
+		log.Fatal(e)
+	}
+
+	return r
+}
+
+func convertAnyToString(data any) string {
+
+	var r string
+
+	if b, e := json.Marshal(data); e == nil {
+
+		if e := json.Unmarshal(b, &r); e != nil {
+			log.Fatalln(r)
+		}
+
+	} else {
+		log.Fatalln(e)
+	}
+
+	return r
+}
+
+func convertStringToFloat(data string) float64 {
+
+	if f, e := strconv.ParseFloat(convertAnyToString(data), 64); e == nil {
+		return f
+	} else {
+		log.Fatalln(e)
+	}
+	return 0
+}
+
 // Json response from Binance perpetual future API.
 func requestEndpoint(endpoint string, queries *map[string]string, response any) {
 
@@ -96,7 +157,7 @@ func requestEndpoint(endpoint string, queries *map[string]string, response any) 
 
 	} else if api.weight.used > 0 {
 
-		time.Sleep(time.Second)
+		time.Sleep(time.Microsecond * 500000)
 	}
 
 	// Create request.
@@ -185,7 +246,7 @@ func getSliceHistoricalTrades(symbol string, fromId uint64) []Trade {
 	// Queries.
 	que := map[string]string{
 		"symbol": symbol,
-		"limit":  "100",
+		"limit":  "1000",
 		"fromId": strconv.FormatUint(fromId, 10),
 	}
 
@@ -234,8 +295,6 @@ func getAllHistoricalTrades(symbol string, fromId uint64, slice func(trades []Tr
 	for {
 
 		t := getSliceHistoricalTrades(symbol, fromId)
-
-		log.Println("len", len(t))
 
 		// Sort array by trade id that get last trade id.
 		sort.Slice(t, func(i, j int) bool {
@@ -327,4 +386,48 @@ func updateHistoricalTrades(symbol string) {
 	}
 
 	saveHistoricalTrades(symbol, tdi+1)
+}
+
+// Getted and return slice klines.
+func getSliceKlines(symbol, interval string) []Kline {
+
+	var jsn [][]any
+
+	kls := make([]Kline, 0)
+
+	// Queries.
+	quy := map[string]string{
+		"symbol":    symbol,
+		"interval":  interval,
+		"limit":     "1500",
+		"startTime": strconv.FormatInt(time.Date(2019, time.December, 31, 23, 59, 59, 0, time.UTC).UnixMilli(), 10),
+	}
+
+	// Request candlestick data.
+	requestEndpoint("klines", &quy, &jsn)
+
+	for _, r := range jsn {
+
+		if len(r) == 12 {
+
+			kls = append(kls, Kline{
+				OpenTime:                 time.UnixMilli(convertAnyToInt(r[0])).UTC(),
+				OpenPrice:                convertStringToFloat(convertAnyToString(r[1])),
+				HighPrice:                convertStringToFloat(convertAnyToString(r[2])),
+				LowPrice:                 convertStringToFloat(convertAnyToString(r[3])),
+				ClosePrice:               convertStringToFloat(convertAnyToString(r[4])),
+				Volume:                   convertStringToFloat(convertAnyToString(r[5])),
+				CloseTime:                time.UnixMilli(convertAnyToInt(r[6])).UTC(),
+				QuoteAssetVolume:         convertStringToFloat(convertAnyToString(r[7])),
+				NumberOfTrades:           convertAnyToUint(r[8]),
+				TakerBuyBaseAssetVolume:  convertStringToFloat(convertAnyToString(r[9])),
+				TakerBuyQuoteAssetVolume: convertStringToFloat(convertAnyToString(r[10])),
+			})
+
+		} else {
+			log.Fatalln("Unreadable data.")
+		}
+	}
+
+	return kls
 }

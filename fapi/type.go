@@ -24,3 +24,17 @@ type Trade struct {
 	Time         time.Time
 	IsBuyerMaker bool
 }
+
+type Kline struct {
+	OpenTime                 time.Time
+	OpenPrice                float64
+	HighPrice                float64
+	LowPrice                 float64
+	ClosePrice               float64
+	Volume                   float64
+	CloseTime                time.Time
+	QuoteAssetVolume         float64
+	NumberOfTrades           uint64
+	TakerBuyBaseAssetVolume  float64
+	TakerBuyQuoteAssetVolume float64
+}
