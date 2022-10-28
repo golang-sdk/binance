@@ -256,6 +256,12 @@ func getAllHistoricalTrades(symbol string, fromId uint64, slice func(trades []Tr
 // Getting and save historical trades.
 func saveHistoricalTrades(symbol string, fromId uint64) {
 
+	// Last trade ID of trades.
+	var lastID uint64
+
+	// Last time of trades.
+	var lastTime time.Time
+
 	// Getting historical trades.
 	getAllHistoricalTrades("BTCUSDT", fromId, func(trades []Trade) {
 
@@ -277,12 +283,22 @@ func saveHistoricalTrades(symbol string, fromId uint64) {
 			} else {
 				q += "(?,?,?,?,?,?),"
 			}
+
+			lastID = trades[i].TradeId
+			lastTime = trades[i].Time
 		}
 
-		res, err := api.database.Exec(fmt.Sprintf(q, "ft_btcusdt"), p...)
+		// Save trades to database.
+		if r, e := api.database.Exec(fmt.Sprintf(q, "ft_btcusdt"), p...); e != nil {
+			log.Fatal(e, r)
+		}
 
-		if err != nil {
-			log.Fatal(err, res)
+		// Save information of last saved trade.
+		if r, e := api.database.Exec("UPDATE ft_last_saved SET tid = ?, time = ? WHERE symbol = ?",
+			lastID,
+			lastTime.Format("2006-01-02 15:04:05.000"),
+			symbol); e != nil {
+			log.Fatal(e, r)
 		}
 	})
 }
