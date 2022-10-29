@@ -217,3 +217,18 @@ func getSliceKlines(symbol string, start time.Time) []Kline {
 
 	return ke
 }
+
+// Getting all klines splitted by slices.
+func getAllKlines(symbol string, start time.Time, slice func(klines []Kline)) {
+
+	// Every new loop shift the start time.
+	for sk := getSliceKlines(symbol, start); len(sk) > 0; sk = getSliceKlines(symbol, sk[len(sk)-1].OT.Truncate(time.Minute).Add(time.Minute)) {
+
+		// Check that the last minute is closed.
+		if sk[len(sk)-1].OT.Truncate(time.Minute).Before(api.weight.last.Truncate(time.Minute)) {
+			slice(sk)
+		} else {
+			slice(sk[:len(sk)-1])
+		}
+	}
+}
