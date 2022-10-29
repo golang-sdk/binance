@@ -16,25 +16,16 @@ package fapi
 
 import "time"
 
-type Trade struct {
-	TradeId      uint64
-	Price        float64
-	Qty          float64
-	QuoteQty     float64
-	Time         time.Time
-	IsBuyerMaker bool
-}
-
 type Kline struct {
-	OpenTime                 time.Time
-	OpenPrice                float64
-	HighPrice                float64
-	LowPrice                 float64
-	ClosePrice               float64
-	Volume                   float64
-	CloseTime                time.Time
-	QuoteAssetVolume         float64
-	NumberOfTrades           uint64
-	TakerBuyBaseAssetVolume  float64
-	TakerBuyQuoteAssetVolume float64
+	OT time.Time // Kline open time.
+	OP float64   // Open price.
+	HP float64   // High price.
+	LP float64   // Low price.
+	CP float64   // Close price.
+	VE float64   // Volume.
+	CT time.Time // Kline Close time.
+	QA float64   // Quote asset volume.
+	NT uint64    // Number of trades.
+	TB float64   // Taker buy base asset volume.
+	TQ float64   // Taker buy quote asset volume.
 }

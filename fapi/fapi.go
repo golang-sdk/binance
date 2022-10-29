@@ -167,7 +167,7 @@ func requestEndpoint(endpoint string, query *map[string]string, response any) {
 }
 
 // Getting and return slice sorted klines by open time.
-func getSliceKlines(symbol string, start time.Time, interval string) []Kline {
+func getSliceKlines(symbol string, start time.Time) []Kline {
 
 	// Unparsed klines.
 	var jn [][]any
@@ -178,7 +178,7 @@ func getSliceKlines(symbol string, start time.Time, interval string) []Kline {
 	// Queries.
 	qy := map[string]string{
 		"symbol":    symbol,
-		"interval":  interval,
+		"interval":  "1m",
 		"limit":     "1500",
 		"startTime": strconv.FormatInt(start.UnixMilli(), 10),
 	}
@@ -192,17 +192,17 @@ func getSliceKlines(symbol string, start time.Time, interval string) []Kline {
 		if len(r) == 12 {
 
 			ke = append(ke, Kline{
-				OpenTime:                 time.UnixMilli(convertAnyToInt(r[0])).UTC(),
-				OpenPrice:                convertStringToFloat(convertAnyToString(r[1])),
-				HighPrice:                convertStringToFloat(convertAnyToString(r[2])),
-				LowPrice:                 convertStringToFloat(convertAnyToString(r[3])),
-				ClosePrice:               convertStringToFloat(convertAnyToString(r[4])),
-				Volume:                   convertStringToFloat(convertAnyToString(r[5])),
-				CloseTime:                time.UnixMilli(convertAnyToInt(r[6])).UTC(),
-				QuoteAssetVolume:         convertStringToFloat(convertAnyToString(r[7])),
-				NumberOfTrades:           convertAnyToUint(r[8]),
-				TakerBuyBaseAssetVolume:  convertStringToFloat(convertAnyToString(r[9])),
-				TakerBuyQuoteAssetVolume: convertStringToFloat(convertAnyToString(r[10])),
+				OT: time.UnixMilli(convertAnyToInt(r[0])).UTC(),     // Kline open time.
+				OP: convertStringToFloat(convertAnyToString(r[1])),  // Open price.
+				HP: convertStringToFloat(convertAnyToString(r[2])),  // High price.
+				LP: convertStringToFloat(convertAnyToString(r[3])),  // Low price.
+				CP: convertStringToFloat(convertAnyToString(r[4])),  // Close price.
+				VE: convertStringToFloat(convertAnyToString(r[5])),  // Volume
+				CT: time.UnixMilli(convertAnyToInt(r[6])).UTC(),     // Kline Close time
+				QA: convertStringToFloat(convertAnyToString(r[7])),  // Quote asset volume.
+				NT: convertAnyToUint(r[8]),                          // Number of trades.
+				TB: convertStringToFloat(convertAnyToString(r[9])),  // Taker buy base asset volume.
+				TQ: convertStringToFloat(convertAnyToString(r[10])), // Taker buy quote asset volume.
 			})
 
 		} else {
@@ -212,7 +212,7 @@ func getSliceKlines(symbol string, start time.Time, interval string) []Kline {
 
 	// Sort array by open time
 	sort.Slice(ke, func(i, j int) bool {
-		return ke[i].OpenTime.Before(ke[j].OpenTime)
+		return ke[i].OT.Before(ke[j].OT)
 	})
 
 	return ke
