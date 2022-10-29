@@ -55,7 +55,7 @@ var api struct {
 }
 
 // Initialize default values for connect API, prepare and ping connect to database.
-func Init(key, user, password, address, database string) {
+func Init(key, user, password, host, database string) {
 
 	api.key = key
 	api.client = &http.Client{Timeout: time.Minute}
@@ -68,7 +68,7 @@ func Init(key, user, password, address, database string) {
 			"%s:%s@tcp(%s)/%s?allowNativePasswords=false&checkConnLiveness=false&maxAllowedPacket=0",
 			user,
 			password,
-			address,
+			host,
 			database)); e == nil {
 
 		api.database = d
@@ -82,69 +82,8 @@ func Init(key, user, password, address, database string) {
 	}
 }
 
-func convertAnyToInt(data any) int64 {
-
-	var r int64
-
-	if b, e := json.Marshal(data); e == nil {
-
-		if e := json.Unmarshal(b, &r); e != nil {
-			log.Fatalln(r)
-		}
-
-	} else {
-		log.Fatal(e)
-	}
-
-	return r
-}
-
-func convertAnyToUint(data any) uint64 {
-
-	var r uint64
-
-	if b, e := json.Marshal(data); e == nil {
-
-		if e := json.Unmarshal(b, &r); e != nil {
-			log.Fatalln(r)
-		}
-
-	} else {
-		log.Fatal(e)
-	}
-
-	return r
-}
-
-func convertAnyToString(data any) string {
-
-	var r string
-
-	if b, e := json.Marshal(data); e == nil {
-
-		if e := json.Unmarshal(b, &r); e != nil {
-			log.Fatalln(r)
-		}
-
-	} else {
-		log.Fatalln(e)
-	}
-
-	return r
-}
-
-func convertStringToFloat(data string) float64 {
-
-	if f, e := strconv.ParseFloat(convertAnyToString(data), 64); e == nil {
-		return f
-	} else {
-		log.Fatalln(e)
-	}
-	return 0
-}
-
 // Json response from Binance perpetual future API.
-func requestEndpoint(endpoint string, queries *map[string]string, response any) {
+func requestEndpoint(endpoint string, query *map[string]string, response any) {
 
 	// Control used weight.
 	if api.weight.used >= api.weight.maximum {
@@ -161,256 +100,98 @@ func requestEndpoint(endpoint string, queries *map[string]string, response any) 
 	}
 
 	// Create request.
-	req, err := http.NewRequest("GET", fmt.Sprintf("https://fapi.binance.com/fapi/v1/%s", endpoint), nil)
-	if err != nil {
-		log.Fatalf("Error %s when create new request.", err)
+	rt, er := http.NewRequest("GET", fmt.Sprintf("https://fapi.binance.com/fapi/v1/%s", endpoint), nil)
+	if er != nil {
+		log.Fatalf("Error %s when create new request.", er)
 	}
 
 	// Adding queries.
-	if is := queries != nil; is && len(*queries) > 0 {
+	if query != nil {
 
-		que := req.URL.Query()
+		qy := rt.URL.Query()
 
-		for k, v := range *queries {
-			que.Add(k, v)
+		for k, v := range *query {
+			qy.Add(k, v)
 		}
 
-		req.URL.RawQuery = que.Encode()
+		rt.URL.RawQuery = qy.Encode()
 	}
 
 	// Adding headers.
-	req.Header.Add("Content-Type", "application/json")
-	req.Header.Add("X-MBX-APIKEY", api.key)
+	rt.Header.Add("Content-Type", "application/json")
+	rt.Header.Add("X-MBX-APIKEY", api.key)
 
 	// Execute request.
-	res, err := api.client.Do(req)
-	if err != nil {
-		log.Fatalf("Error %s when execute request.", err)
+	re, er := api.client.Do(rt)
+	if er != nil {
+		log.Fatalf("Error %s when execute request.", er)
 	}
-	defer res.Body.Close()
+	defer re.Body.Close()
 
 	// Detect status сode.
-	if res.StatusCode != 200 {
-		log.Fatalf("Error status %d code.", res.StatusCode)
-	} else if res.StatusCode == 429 || res.StatusCode == 418 {
-		log.Fatalf("Error status code %d this request is banned.", res.StatusCode)
+	if re.StatusCode != 200 {
+		log.Fatalf("Error status %d code.", re.StatusCode)
+	} else if re.StatusCode == 429 || re.StatusCode == 418 {
+		log.Fatalf("Error status code %d this request is banned.", re.StatusCode)
 	}
 
 	// Detect content type.
-	if res.Header.Get("Content-Type") != "application/json" {
+	if re.Header.Get("Content-Type") != "application/json" {
 		log.Fatalln("Error the request returned an unexpected content type.")
 	}
 
 	// Server response time.
-	if t, e := time.Parse(time.RFC1123, res.Header.Get("Date")); e == nil {
+	if t, e := time.Parse(time.RFC1123, re.Header.Get("Date")); e == nil {
 		api.weight.last = t
 	} else {
 		log.Fatalf("Error %s when parse response header date.", e)
 	}
 
 	// Weight responce.
-	if w, e := strconv.ParseUint(res.Header.Get("X-MBX-USED-WEIGHT-1M"), 10, 16); e == nil {
+	if w, e := strconv.ParseUint(re.Header.Get("X-MBX-USED-WEIGHT-1M"), 10, 16); e == nil {
 		api.weight.used = uint16(w)
 	} else {
 		log.Fatalf("Error %s when getting weight.", e)
 	}
 
 	// Body from response.
-	body, err := io.ReadAll(res.Body)
-	if err != nil {
-		log.Fatalf("Error %s when read body request.", err)
+	by, er := io.ReadAll(re.Body)
+	if er != nil {
+		log.Fatalf("Error %s when read body request.", er)
 	}
 
 	// Parse json.
-	if e := json.Unmarshal(body, response); e != nil {
+	if e := json.Unmarshal(by, response); e != nil {
 		log.Fatalf("Error %s when getting trades and json marshal.", e)
 	}
 }
 
-// Getted and return slice trades.
-func getSliceHistoricalTrades(symbol string, fromId uint64) []Trade {
+// Getting and return slice sorted klines by open time.
+func getSliceKlines(symbol string, start time.Time, interval string) []Kline {
 
-	// Transactions from API responce.
-	var jtr []struct {
-		ID           uint64 `json:"id"`
-		Price        string `json:"price"`
-		Qty          string `json:"qty"`
-		QuoteQty     string `json:"quoteQty"`
-		Time         int64  `json:"time"`
-		IsBuyerMaker bool   `json:"isBuyerMaker"`
-	}
+	// Unparsed klines.
+	var jn [][]any
 
-	// Parsed transactions.
-	tra := make([]Trade, 0)
+	// Parsed klines.
+	var ke []Kline
 
 	// Queries.
-	que := map[string]string{
-		"symbol": symbol,
-		"limit":  "1000",
-		"fromId": strconv.FormatUint(fromId, 10),
-	}
-
-	// Request historical trades.
-	requestEndpoint("historicalTrades", &que, &jtr)
-
-	// Fields type conversion.
-	for _, t := range jtr {
-
-		trade := Trade{
-			TradeId:      t.ID,
-			Time:         time.UnixMilli(t.Time).UTC(),
-			IsBuyerMaker: t.IsBuyerMaker,
-		}
-
-		// Price convert string to float.
-		if f, e := strconv.ParseFloat(t.Price, 64); e == nil {
-			trade.Price = f
-		} else {
-			log.Fatalf("Error %s when convert type price.", e)
-		}
-
-		// Qty convert string to float.
-		if f, e := strconv.ParseFloat(t.Qty, 64); e == nil {
-			trade.Qty = f
-		} else {
-			log.Fatalf("Error %s when convert type qty.", e)
-		}
-
-		// Quote qty convert string to float.
-		if f, e := strconv.ParseFloat(t.QuoteQty, 64); e == nil {
-			trade.QuoteQty = f
-		} else {
-			log.Fatalf("Error %s when convert type quote qty.", e)
-		}
-
-		tra = append(tra, trade)
-	}
-
-	return tra
-}
-
-// Getting all historical trades splitted by slices, in one slice conines thousand transactions.
-func getAllHistoricalTrades(symbol string, fromId uint64, slice func(trades []Trade)) {
-
-	for {
-
-		t := getSliceHistoricalTrades(symbol, fromId)
-
-		// Sort array by trade id that get last trade id.
-		sort.Slice(t, func(i, j int) bool {
-			return t[i].TradeId < t[j].TradeId
-		})
-
-		if len(t) > 0 {
-
-			// Call hook.
-			slice(t)
-
-			// Offset from id by the limit.
-			fromId = t[len(t)-1].TradeId + 1
-		}
-	}
-}
-
-// Getting and save historical trades.
-func saveHistoricalTrades(symbol string, fromId uint64) {
-
-	// Last trade ID from list trades.
-	var lastID uint64
-
-	// Last time of trades.
-	var lastTime time.Time
-
-	// Getting historical trades.
-	getAllHistoricalTrades(symbol, fromId, func(trades []Trade) {
-
-		q := "INSERT INTO %s (id, time, price, qty, quote_qty, is_buyer_maker) VALUES"
-
-		p := make([]any, 0)
-
-		for i := 0; i < len(trades); i++ {
-
-			p = append(p, trades[i].TradeId)
-			p = append(p, trades[i].Time.Format("2006-01-02 15:04:05.000"))
-			p = append(p, trades[i].Price)
-			p = append(p, trades[i].Qty)
-			p = append(p, trades[i].QuoteQty)
-			p = append(p, trades[i].IsBuyerMaker)
-
-			if i == len(trades)-1 {
-				q += "(?,?,?,?,?,?)"
-			} else {
-				q += "(?,?,?,?,?,?),"
-			}
-
-			lastID = trades[i].TradeId
-			lastTime = trades[i].Time
-		}
-
-		// Save trades to database.
-		if r, e := api.database.Exec(fmt.Sprintf(q, "ft_btcusdt"), p...); e != nil {
-			log.Fatal(e, r)
-		}
-
-		// Save information of last saved trade.
-		if r, e := api.database.Exec("UPDATE ft_last_saved SET tid = ?, time = ? WHERE symbol = ?",
-			lastID,
-			lastTime.Format("2006-01-02 15:04:05.000"),
-			symbol); e != nil {
-			log.Fatal(e, r)
-		}
-	})
-}
-
-// Updates transactions in the database from last saved to now.
-func updateHistoricalTrades(symbol string) {
-
-	// Last trade ID from database.
-	var tdi uint64
-
-	// Is it available information of the last save.
-	var is bool
-
-	// Select is it available information of the last save.
-	if e := api.database.QueryRow("SELECT COUNT(*) FROM ft_last_saved WHERE symbol = ?", symbol).Scan(&is); e != nil {
-		log.Fatalln(e)
-	}
-
-	if is {
-		// Select last trade ID from database.
-		if e := api.database.QueryRow("SELECT tid FROM ft_last_saved WHERE symbol = ?", symbol).Scan(&tdi); e != nil {
-			log.Fatalln(e)
-		}
-	} else {
-		tdi = 0
-	}
-
-	saveHistoricalTrades(symbol, tdi+1)
-}
-
-// Getted and return slice klines.
-func getSliceKlines(symbol, interval string) []Kline {
-
-	var jsn [][]any
-
-	kls := make([]Kline, 0)
-
-	// Queries.
-	quy := map[string]string{
+	qy := map[string]string{
 		"symbol":    symbol,
 		"interval":  interval,
 		"limit":     "1500",
-		"startTime": strconv.FormatInt(time.Date(2019, time.December, 31, 23, 59, 59, 0, time.UTC).UnixMilli(), 10),
+		"startTime": strconv.FormatInt(start.UnixMilli(), 10),
 	}
 
-	// Request candlestick data.
-	requestEndpoint("klines", &quy, &jsn)
+	// Request and getting klines data.
+	requestEndpoint("klines", &qy, &jn)
 
-	for _, r := range jsn {
+	// Parse klines.
+	for _, r := range jn {
 
 		if len(r) == 12 {
 
-			kls = append(kls, Kline{
+			ke = append(ke, Kline{
 				OpenTime:                 time.UnixMilli(convertAnyToInt(r[0])).UTC(),
 				OpenPrice:                convertStringToFloat(convertAnyToString(r[1])),
 				HighPrice:                convertStringToFloat(convertAnyToString(r[2])),
@@ -425,9 +206,14 @@ func getSliceKlines(symbol, interval string) []Kline {
 			})
 
 		} else {
-			log.Fatalln("Unreadable data.")
+			log.Fatalln("Unreadable kline data.")
 		}
 	}
 
-	return kls
+	// Sort array by open time
+	sort.Slice(ke, func(i, j int) bool {
+		return ke[i].OpenTime.Before(ke[j].OpenTime)
+	})
+
+	return ke
 }
