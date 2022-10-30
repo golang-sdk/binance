@@ -237,7 +237,7 @@ func candlesLoops(from time.Time, symbol string, loop func(candles []Сandle)) {
 func candlesSave(from time.Time, symbol string) {
 
 	// Receive candles.
-	candlesLoops(time.Date(2022, time.October, 28, 0, 0, 0, 0, time.UTC), symbol, func(ce []Сandle) {
+	candlesLoops(from, symbol, func(ce []Сandle) {
 
 		// Prepared data to be inserted into the database.
 		da := make([]any, 0)
