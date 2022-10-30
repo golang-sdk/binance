@@ -23,6 +23,7 @@ import (
 	"net/http"
 	"sort"
 	"strconv"
+	"strings"
 	"time"
 
 	_ "github.com/go-sql-driver/mysql"
@@ -230,4 +231,54 @@ func candlesLoops(from time.Time, symbol string, loop func(candles []Сandle)) {
 			loop(cs[:len(cs)-1])
 		}
 	}
+}
+
+// Receives candles via function "candlesLoops" and save to database.
+func candlesSave(from time.Time, symbol string) {
+
+	// Receive candles.
+	candlesLoops(time.Date(2022, time.October, 28, 0, 0, 0, 0, time.UTC), symbol, func(ce []Сandle) {
+
+		// Prepared data to be inserted into the database.
+		da := make([]any, 0)
+
+		// MySQL query.
+		qy := fmt.Sprintf(`INSERT INTO fcm_%s (
+			time,
+			open,
+			high,
+			low,
+			close,
+			number,
+			quantity,
+			purchases,
+			asset,
+			sales) VALUES`, strings.ToLower(symbol))
+
+		// Preparation data before inserting into the database.
+		for i := 0; i < len(ce); i++ {
+
+			da = append(da, ce[i].Time.Format("2006-01-02 15:04:05"))
+			da = append(da, ce[i].Open)
+			da = append(da, ce[i].High)
+			da = append(da, ce[i].Low)
+			da = append(da, ce[i].Close)
+			da = append(da, ce[i].Number)
+			da = append(da, ce[i].Quantity)
+			da = append(da, ce[i].Purchases)
+			da = append(da, ce[i].Asset)
+			da = append(da, ce[i].Sales)
+
+			if i == len(ce)-1 {
+				qy += "(?,?,?,?,?,?,?,?,?,?)"
+			} else {
+				qy += "(?,?,?,?,?,?,?,?,?,?),"
+			}
+		}
+
+		// Inserting klines to database.
+		if r, e := api.database.Exec(qy, da...); e != nil {
+			log.Fatal(e, r)
+		}
+	})
 }
