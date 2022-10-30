@@ -234,7 +234,7 @@ func candlesLoops(from time.Time, symbol string, loop func(candles []Сandle)) {
 }
 
 // Receives candles via function "candlesLoops" and save to database.
-func insertCandlesIntoDatabase(from time.Time, symbol string) {
+func candlesSaveIntoDatabase(from time.Time, symbol string) {
 
 	// Receive candles.
 	candlesLoops(from, symbol, func(ce []Сandle) {
@@ -281,4 +281,16 @@ func insertCandlesIntoDatabase(from time.Time, symbol string) {
 			log.Fatal(e, r)
 		}
 	})
+}
+
+// Return count of saved candles from database.
+func candlesCountInDatabase(symbol string) uint64 {
+
+	var ct uint64
+
+	if e := api.database.QueryRow(fmt.Sprintf("SELECT COUNT(*) FROM fc_%s", strings.ToLower(symbol))).Scan(&ct); e != nil {
+		log.Fatalln(e)
+	}
+
+	return ct
 }
