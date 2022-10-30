@@ -167,7 +167,7 @@ func requestEndpoint(endpoint string, query *map[string]string, response any) {
 	}
 }
 
-// Receives via Binance Futures API slice of an array candles and returns this slice sorted by open time.
+// Receives via Binance Futures API slice of an array candles and return this slice sorted by open time.
 func candlesSlice(from time.Time, symbol string) []Сandle {
 
 	// Unparsed candles.
@@ -243,7 +243,7 @@ func candlesSave(from time.Time, symbol string) {
 		da := make([]any, 0)
 
 		// MySQL query.
-		qy := fmt.Sprintf(`INSERT INTO fcm_%s (
+		qy := fmt.Sprintf(`INSERT INTO fc_%s (
 			time,
 			open,
 			high,
