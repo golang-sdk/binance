@@ -234,7 +234,7 @@ func candlesLoops(from time.Time, symbol string, loop func(candles []Сandle)) {
 }
 
 // Receives candles via function "candlesLoops" and save to database.
-func candlesSave(from time.Time, symbol string) {
+func insertCandlesIntoDatabase(from time.Time, symbol string) {
 
 	// Receive candles.
 	candlesLoops(from, symbol, func(ce []Сandle) {
