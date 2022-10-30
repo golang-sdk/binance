@@ -167,7 +167,7 @@ func requestEndpoint(endpoint string, query *map[string]string, response any) {
 }
 
 // Receives via Binance Futures API slice of an array candles and returns this slice sorted by open time.
-func receiveCandles(symbol string, start time.Time) []Сandle {
+func candlesSlice(from time.Time, symbol string) []Сandle {
 
 	// Unparsed candles.
 	var jn [][]any
@@ -180,7 +180,7 @@ func receiveCandles(symbol string, start time.Time) []Сandle {
 		"symbol":    symbol,
 		"interval":  "1m",
 		"limit":     "1500",
-		"startTime": strconv.FormatInt(start.UnixMilli(), 10),
+		"startTime": strconv.FormatInt(from.UnixMilli(), 10),
 	}
 
 	// Request and getting klines data.
@@ -217,17 +217,17 @@ func receiveCandles(symbol string, start time.Time) []Сandle {
 	return ce
 }
 
-// Receives via function "receive Candles" candles and in new loop shift time to the end of the slice from previous loop.
-func receiveСandlesСyclically(symbol string, start time.Time, slice func(candles []Сandle)) {
+// Receives via function "candlesSlice" candles and in new loop shift time to the end of the slice from previous loop.
+func candlesLoops(from time.Time, symbol string, loop func(candles []Сandle)) {
 
 	// In every new loop shift time to the end of the slice from previous loop.
-	for cs := receiveCandles(symbol, start); len(cs) > 0; cs = receiveCandles(symbol, cs[len(cs)-1].Time.Truncate(time.Minute).Add(time.Minute)) {
+	for cs := candlesSlice(from, symbol); len(cs) > 0; cs = candlesSlice(cs[len(cs)-1].Time.Truncate(time.Minute).Add(time.Minute), symbol) {
 
 		// Check that the last minute is closed.
 		if cs[len(cs)-1].Time.Truncate(time.Minute).Before(api.weight.last.Truncate(time.Minute)) {
-			slice(cs)
+			loop(cs)
 		} else {
-			slice(cs[:len(cs)-1])
+			loop(cs[:len(cs)-1])
 		}
 	}
 }
