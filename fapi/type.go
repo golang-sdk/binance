@@ -16,16 +16,15 @@ package fapi
 
 import "time"
 
-type Kline struct {
-	OT time.Time // Kline open time.
-	OP float64   // Open price.
-	HP float64   // High price.
-	LP float64   // Low price.
-	CP float64   // Close price.
-	VE float64   // Volume.
-	CT time.Time // Kline Close time.
-	QA float64   // Quote asset volume.
-	NT uint64    // Number of trades.
-	TB float64   // Taker buy base asset volume.
-	TQ float64   // Taker buy quote asset volume.
+type Сandle struct {
+	Time      time.Time // Open time.
+	Open      float64   // Open price.
+	High      float64   // High price.
+	Low       float64   // Low price.
+	Close     float64   // Close price.
+	Number    uint64    // Number of trades.
+	Quantity  float64   // Total trading volume of the coin.
+	Purchases float64   // Volume in coins purchased by the taker.
+	Asset     float64   // Total trading volume in fiat.
+	Sales     float64   // Volume in fiat sales by the taker.
 }

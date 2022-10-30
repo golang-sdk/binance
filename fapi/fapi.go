@@ -166,14 +166,14 @@ func requestEndpoint(endpoint string, query *map[string]string, response any) {
 	}
 }
 
-// Getting and return slice sorted klines by open time.
-func getSliceKlines(symbol string, start time.Time) []Kline {
+// Receives via Binance Futures API slice of an array candles and returns this slice sorted by open time.
+func receiveCandles(symbol string, start time.Time) []Сandle {
 
-	// Unparsed klines.
+	// Unparsed candles.
 	var jn [][]any
 
-	// Parsed klines.
-	var ke []Kline
+	// Parsed candles.
+	var ce []Сandle
 
 	// Queries.
 	qy := map[string]string{
@@ -186,23 +186,22 @@ func getSliceKlines(symbol string, start time.Time) []Kline {
 	// Request and getting klines data.
 	requestEndpoint("klines", &qy, &jn)
 
-	// Parse klines.
+	// Parse candles.
 	for _, r := range jn {
 
 		if len(r) == 12 {
 
-			ke = append(ke, Kline{
-				OT: time.UnixMilli(convertAnyToInt(r[0])).UTC(),     // Kline open time.
-				OP: convertStringToFloat(convertAnyToString(r[1])),  // Open price.
-				HP: convertStringToFloat(convertAnyToString(r[2])),  // High price.
-				LP: convertStringToFloat(convertAnyToString(r[3])),  // Low price.
-				CP: convertStringToFloat(convertAnyToString(r[4])),  // Close price.
-				VE: convertStringToFloat(convertAnyToString(r[5])),  // Volume
-				CT: time.UnixMilli(convertAnyToInt(r[6])).UTC(),     // Kline Close time
-				QA: convertStringToFloat(convertAnyToString(r[7])),  // Quote asset volume.
-				NT: convertAnyToUint(r[8]),                          // Number of trades.
-				TB: convertStringToFloat(convertAnyToString(r[9])),  // Taker buy base asset volume.
-				TQ: convertStringToFloat(convertAnyToString(r[10])), // Taker buy quote asset volume.
+			ce = append(ce, Сandle{
+				Time:      time.UnixMilli(convertAnyToInt(r[0])).UTC(),     // Open time.
+				Open:      convertStringToFloat(convertAnyToString(r[1])),  // Open price.
+				High:      convertStringToFloat(convertAnyToString(r[2])),  // High price.
+				Low:       convertStringToFloat(convertAnyToString(r[3])),  // Low price.
+				Close:     convertStringToFloat(convertAnyToString(r[4])),  // Close price.
+				Number:    convertAnyToUint(r[8]),                          // Number of trades.
+				Quantity:  convertStringToFloat(convertAnyToString(r[5])),  // Volume.
+				Purchases: convertStringToFloat(convertAnyToString(r[9])),  // Taker buy base asset volume.
+				Asset:     convertStringToFloat(convertAnyToString(r[7])),  // Quote asset volume.
+				Sales:     convertStringToFloat(convertAnyToString(r[10])), // Taker buy quote asset volume.
 			})
 
 		} else {
@@ -211,24 +210,24 @@ func getSliceKlines(symbol string, start time.Time) []Kline {
 	}
 
 	// Sort array by open time
-	sort.Slice(ke, func(i, j int) bool {
-		return ke[i].OT.Before(ke[j].OT)
+	sort.Slice(ce, func(i, j int) bool {
+		return ce[i].Time.Before(ce[j].Time)
 	})
 
-	return ke
+	return ce
 }
 
-// Getting all klines splitted by slices.
-func getAllKlines(symbol string, start time.Time, slice func(klines []Kline)) {
+// Receives via function "receive Candles" candles and in new loop shift time to the end of the slice from previous loop.
+func receiveСandlesСyclically(symbol string, start time.Time, slice func(candles []Сandle)) {
 
-	// Every new loop shift the start time.
-	for sk := getSliceKlines(symbol, start); len(sk) > 0; sk = getSliceKlines(symbol, sk[len(sk)-1].OT.Truncate(time.Minute).Add(time.Minute)) {
+	// In every new loop shift time to the end of the slice from previous loop.
+	for cs := receiveCandles(symbol, start); len(cs) > 0; cs = receiveCandles(symbol, cs[len(cs)-1].Time.Truncate(time.Minute).Add(time.Minute)) {
 
 		// Check that the last minute is closed.
-		if sk[len(sk)-1].OT.Truncate(time.Minute).Before(api.weight.last.Truncate(time.Minute)) {
-			slice(sk)
+		if cs[len(cs)-1].Time.Truncate(time.Minute).Before(api.weight.last.Truncate(time.Minute)) {
+			slice(cs)
 		} else {
-			slice(sk[:len(sk)-1])
+			slice(cs[:len(cs)-1])
 		}
 	}
 }
