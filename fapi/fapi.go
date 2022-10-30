@@ -168,13 +168,13 @@ func requestEndpoint(endpoint string, query *map[string]string, response any) {
 }
 
 // Receives via Binance Futures API slice of an array candles and return this slice sorted by open time.
-func candlesSlice(from time.Time, symbol string) []Сandle {
+func candlesSlice(from time.Time, symbol string) []Candle {
 
 	// Unparsed candles.
 	var jn [][]any
 
 	// Parsed candles.
-	var ce []Сandle
+	var ce []Candle
 
 	// Queries.
 	qy := map[string]string{
@@ -192,7 +192,7 @@ func candlesSlice(from time.Time, symbol string) []Сandle {
 
 		if len(r) == 12 {
 
-			ce = append(ce, Сandle{
+			ce = append(ce, Candle{
 				Time:      time.UnixMilli(convertAnyToInt(r[0])).UTC(),     // Open time.
 				Open:      convertStringToFloat(convertAnyToString(r[1])),  // Open price.
 				High:      convertStringToFloat(convertAnyToString(r[2])),  // High price.
@@ -219,7 +219,7 @@ func candlesSlice(from time.Time, symbol string) []Сandle {
 }
 
 // Receives via function "candlesSlice" candles and in new loop shift time to the end of the slice from previous loop.
-func candlesLoops(from time.Time, symbol string, loop func(candles []Сandle)) {
+func candlesLoops(from time.Time, symbol string, loop func(candles []Candle)) {
 
 	// In every new loop shift time to the end of the slice from previous loop.
 	for cs := candlesSlice(from, symbol); len(cs) > 0; cs = candlesSlice(cs[len(cs)-1].Time.Truncate(time.Minute).Add(time.Minute), symbol) {
@@ -237,14 +237,13 @@ func candlesLoops(from time.Time, symbol string, loop func(candles []Сandle)) {
 func candlesSaveIntoDatabase(from time.Time, symbol string) {
 
 	// Receive candles.
-	candlesLoops(from, symbol, func(ce []Сandle) {
+	candlesLoops(from, symbol, func(ce []Candle) {
 
 		// Prepared data to be inserted into the database.
 		da := make([]any, 0)
 
 		// MySQL query.
-		qy := fmt.Sprintf(`INSERT INTO fc_%s (
-			time,
+		qy := fmt.Sprintf(`INSERT INTO fc_%s (time,
 			open,
 			high,
 			low,
@@ -293,4 +292,25 @@ func candlesCountInDatabase(symbol string) uint64 {
 	}
 
 	return ct
+}
+
+// Return the last save time of the candle
+func candleLastSaveTime(symbol string) *time.Time {
+
+	var te string
+
+	// MySQL query.
+	qy := fmt.Sprintf("SELECT time FROM fc_%s ORDER BY time DESC LIMIT 1", strings.ToLower(symbol))
+
+	if e := api.database.QueryRow(qy).Scan(&te); e != nil {
+		log.Fatalln(e)
+	}
+
+	if t, e := time.Parse("2006-01-02 15:04:05", te); e == nil {
+		return &t
+	} else {
+		log.Fatalln(e)
+	}
+
+	return nil
 }

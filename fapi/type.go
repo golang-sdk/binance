@@ -16,7 +16,7 @@ package fapi
 
 import "time"
 
-type Сandle struct {
+type Candle struct {
 	Time      time.Time // Open time.
 	Open      float64   // Open price.
 	High      float64   // High price.
