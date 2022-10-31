@@ -282,35 +282,36 @@ func candlesSaveIntoDatabase(from time.Time, symbol string) {
 	})
 }
 
-// Return count of saved candles from database.
-func candlesCountInDatabase(symbol string) uint64 {
+// Check the existence of candles in the database, if there
+// candles is exist get the last time of the saved candle and returns
+// time: last saved candle, bool: existence of candles.
+func candleLastSaveTime(symbol string) (time.Time, bool) {
 
-	var ct uint64
+	var nc uint64    // Number candles in database.
+	var st string    // String time from database.
+	var te time.Time // Parsed time.
 
-	if e := api.database.QueryRow(fmt.Sprintf("SELECT COUNT(*) FROM fc_%s", strings.ToLower(symbol))).Scan(&ct); e != nil {
+	// Symbol name to lower case.
+	symbol = strings.ToLower(symbol)
+
+	// Check the existence of candles in the database.
+	if e := api.database.QueryRow(fmt.Sprintf("SELECT COUNT(*) FROM fc_%s", symbol)).Scan(&nc); e != nil {
+		log.Fatalln(e)
+	} else if nc == 0 {
+		return te, false
+	}
+
+	// Select from database last saved candle.
+	if e := api.database.QueryRow(fmt.Sprintf("SELECT time FROM fc_%s ORDER BY time DESC LIMIT 1", symbol)).Scan(&st); e != nil {
 		log.Fatalln(e)
 	}
 
-	return ct
-}
-
-// Return the last save time of the candle
-func candleLastSaveTime(symbol string) *time.Time {
-
-	var te string
-
-	// MySQL query.
-	qy := fmt.Sprintf("SELECT time FROM fc_%s ORDER BY time DESC LIMIT 1", strings.ToLower(symbol))
-
-	if e := api.database.QueryRow(qy).Scan(&te); e != nil {
-		log.Fatalln(e)
-	}
-
-	if t, e := time.Parse("2006-01-02 15:04:05", te); e == nil {
-		return &t
+	// Parse string to time.
+	if t, e := time.Parse("2006-01-02 15:04:05", st); e == nil {
+		te = t
 	} else {
 		log.Fatalln(e)
 	}
 
-	return nil
+	return te, true
 }
