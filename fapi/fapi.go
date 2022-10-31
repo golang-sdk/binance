@@ -224,11 +224,13 @@ func candlesLoops(from time.Time, symbol string, loop func(candles []Candle)) {
 	// In every new loop shift time to the end of the slice from previous loop.
 	for cs := candlesSlice(from, symbol); len(cs) > 0; cs = candlesSlice(cs[len(cs)-1].Time.Truncate(time.Minute).Add(time.Minute), symbol) {
 
+		cl := len(cs)
+
 		// Check that the last minute is closed.
-		if cs[len(cs)-1].Time.Truncate(time.Minute).Before(api.weight.last.Truncate(time.Minute)) {
+		if cs[cl-1].Time.Truncate(time.Minute).Before(api.weight.last.Truncate(time.Minute)) {
 			loop(cs)
-		} else {
-			loop(cs[:len(cs)-1])
+		} else if cl-1 > 0 {
+			loop(cs[:cl-1])
 		}
 	}
 }
@@ -324,4 +326,10 @@ func candlesUpdateIntoDatabase(from time.Time, symbol string) {
 	}
 
 	candlesSaveIntoDatabase(from, symbol)
+}
+
+func Run() {
+
+	candlesUpdateIntoDatabase(time.Date(2022, time.January, 30, 21, 30, 0, 0, time.UTC), "BTCUSDT")
+
 }
