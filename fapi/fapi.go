@@ -287,7 +287,7 @@ func candlesSaveIntoDatabase(from time.Time, symbol string) {
 // Check the existence of candles in the database, if there
 // candles is exist get the last time of the saved candle and returns
 // time: last saved candle, bool: existence of candles.
-func candleLastSave(symbol string) (time.Time, bool) {
+func candleTimeOfLastSaved(symbol string) (time.Time, bool) {
 
 	var nc uint64    // Number candles in database.
 	var st string    // String time from database.
@@ -321,7 +321,7 @@ func candleLastSave(symbol string) (time.Time, bool) {
 // Actualize candles in database via function: candlesSaveIntoDatabase.
 func candlesUpdateIntoDatabase(from time.Time, symbol string) {
 
-	if t, b := candleLastSave(symbol); b {
+	if t, b := candleTimeOfLastSaved(symbol); b {
 		from = t.Add(time.Minute)
 	}
 
