@@ -328,8 +328,44 @@ func candlesUpdateIntoDatabase(from time.Time, symbol string) {
 	candlesSaveIntoDatabase(from, symbol)
 }
 
-func Run() {
+// Selected candles from database and returns their in array.
+func candlesFromDatabase(from time.Time, symbol string) []Candle {
 
-	candlesUpdateIntoDatabase(time.Date(2022, time.January, 30, 21, 30, 0, 0, time.UTC), "BTCUSDT")
+	var pc []Candle // Prepared candles for returns.
+	var ce Candle   // Candle for scan the database.
+	var st string   // Time in string for scan the database.
 
+	qy := fmt.Sprintf(`SELECT time,
+		open,
+		high,
+		low,
+		close,
+		number,
+		quantity,
+		purchases,
+		asset,
+		sales FROM fc_%s WHERE time >= ? ORDER BY time ASC`, strings.ToLower(symbol))
+
+	rw, er := binance.database.Query(qy, from.Format("2006-01-02 15:04"))
+	if er != nil {
+		log.Fatalln(er)
+	}
+	defer rw.Close()
+
+	for rw.Next() {
+
+		if e := rw.Scan(&st, &ce.Open, &ce.High, &ce.Low, &ce.Close, &ce.Number, &ce.Quantity, &ce.Purchases, &ce.Asset, &ce.Sales); e != nil {
+			log.Fatalln(e)
+		}
+
+		if t, e := time.Parse("2006-01-02 15:04:05", st); e == nil {
+			ce.Time = t
+		} else {
+			log.Fatalln(e)
+		}
+
+		pc = append(pc, ce)
+	}
+
+	return pc
 }
