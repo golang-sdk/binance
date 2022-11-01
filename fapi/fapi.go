@@ -30,7 +30,7 @@ import (
 )
 
 // Binance API.
-var api struct {
+var binance struct {
 
 	// MySql data base.
 	database *sql.DB
@@ -58,11 +58,11 @@ var api struct {
 // Initialize default values for connect API, prepare and ping connect to database.
 func Init(key, user, password, host, database string) {
 
-	api.key = key
-	api.client = &http.Client{Timeout: time.Minute}
+	binance.key = key
+	binance.client = &http.Client{Timeout: time.Minute}
 
-	api.weight.last = time.Now().UTC()
-	api.weight.maximum = 1200
+	binance.weight.last = time.Now().UTC()
+	binance.weight.maximum = 1200
 
 	if d, e := sql.Open("mysql",
 		fmt.Sprintf(
@@ -72,13 +72,13 @@ func Init(key, user, password, host, database string) {
 			host,
 			database)); e == nil {
 
-		api.database = d
+		binance.database = d
 
 	} else {
 		log.Fatalf("Error %s when open mysql database.", e)
 	}
 
-	if e := api.database.Ping(); e != nil {
+	if e := binance.database.Ping(); e != nil {
 		log.Fatalf("Error %s when ping to MySql database.", e)
 	}
 }
@@ -87,15 +87,15 @@ func Init(key, user, password, host, database string) {
 func requestEndpoint(endpoint string, query *map[string]string, response any) {
 
 	// Control used weight.
-	if api.weight.used >= api.weight.maximum {
+	if binance.weight.used >= binance.weight.maximum {
 
 		time.Sleep(time.Now().
 			UTC().
 			Truncate(time.Minute).
 			Add(time.Minute).
-			Sub(api.weight.last))
+			Sub(binance.weight.last))
 
-	} else if api.weight.used > 0 {
+	} else if binance.weight.used > 0 {
 
 		time.Sleep(time.Microsecond * 500000)
 	}
@@ -120,10 +120,10 @@ func requestEndpoint(endpoint string, query *map[string]string, response any) {
 
 	// Adding headers.
 	rt.Header.Add("Content-Type", "application/json")
-	rt.Header.Add("X-MBX-APIKEY", api.key)
+	rt.Header.Add("X-MBX-APIKEY", binance.key)
 
 	// Execute request.
-	re, er := api.client.Do(rt)
+	re, er := binance.client.Do(rt)
 	if er != nil {
 		log.Fatalf("Error %s when execute request.", er)
 	}
@@ -143,14 +143,14 @@ func requestEndpoint(endpoint string, query *map[string]string, response any) {
 
 	// Server response time.
 	if t, e := time.Parse(time.RFC1123, re.Header.Get("Date")); e == nil {
-		api.weight.last = t
+		binance.weight.last = t
 	} else {
 		log.Fatalf("Error %s when parse response header date.", e)
 	}
 
 	// Weight responce.
 	if w, e := strconv.ParseUint(re.Header.Get("X-MBX-USED-WEIGHT-1M"), 10, 16); e == nil {
-		api.weight.used = uint16(w)
+		binance.weight.used = uint16(w)
 	} else {
 		log.Fatalf("Error %s when getting weight.", e)
 	}
@@ -227,7 +227,7 @@ func candlesLoops(from time.Time, symbol string, loop func(candles []Candle)) {
 		cl := len(cs)
 
 		// Check that the last minute is closed.
-		if cs[cl-1].Time.Truncate(time.Minute).Before(api.weight.last.Truncate(time.Minute)) {
+		if cs[cl-1].Time.Truncate(time.Minute).Before(binance.weight.last.Truncate(time.Minute)) {
 			loop(cs)
 		} else if cl-1 > 0 {
 			loop(cs[:cl-1])
@@ -278,7 +278,7 @@ func candlesSaveIntoDatabase(from time.Time, symbol string) {
 		}
 
 		// Inserting klines to database.
-		if r, e := api.database.Exec(qy, da...); e != nil {
+		if r, e := binance.database.Exec(qy, da...); e != nil {
 			log.Fatal(e, r)
 		}
 	})
@@ -297,14 +297,14 @@ func candleTimeOfLastSaved(symbol string) (time.Time, bool) {
 	symbol = strings.ToLower(symbol)
 
 	// Check the existence of candles in the database.
-	if e := api.database.QueryRow(fmt.Sprintf("SELECT COUNT(*) FROM fc_%s", symbol)).Scan(&nc); e != nil {
+	if e := binance.database.QueryRow(fmt.Sprintf("SELECT COUNT(*) FROM fc_%s", symbol)).Scan(&nc); e != nil {
 		log.Fatalln(e)
 	} else if nc == 0 {
 		return te, false
 	}
 
 	// Select from database last saved candle.
-	if e := api.database.QueryRow(fmt.Sprintf("SELECT time FROM fc_%s ORDER BY time DESC LIMIT 1", symbol)).Scan(&st); e != nil {
+	if e := binance.database.QueryRow(fmt.Sprintf("SELECT time FROM fc_%s ORDER BY time DESC LIMIT 1", symbol)).Scan(&st); e != nil {
 		log.Fatalln(e)
 	}
 
