@@ -84,7 +84,7 @@ func Init(key, user, password, host, database string) {
 }
 
 // Json response from Binance perpetual future API.
-func requestEndpoint(endpoint string, query *map[string]string, response any) {
+func getEndpoint(endpoint string, query *map[string]string, response any) {
 
 	// Control used weight.
 	if binance.weight.used >= binance.weight.maximum {
@@ -167,14 +167,11 @@ func requestEndpoint(endpoint string, query *map[string]string, response any) {
 	}
 }
 
-// Receives via Binance Futures API slice of an array candles and return this slice sorted by open time.
-func candlesSlice(from time.Time, symbol string) []Candle {
+// Get via Binance Futures API slice of an array candles and return this slice sorted by open time.
+func getCandles(from time.Time, symbol string) []Candle {
 
-	// Unparsed candles.
-	var jn [][]any
-
-	// Parsed candles.
-	var ce []Candle
+	var jn [][]any  // Unparsed candles.
+	var ce []Candle // Parsed candles.
 
 	// Queries.
 	qy := map[string]string{
@@ -184,8 +181,8 @@ func candlesSlice(from time.Time, symbol string) []Candle {
 		"startTime": strconv.FormatInt(from.UnixMilli(), 10),
 	}
 
-	// Request and getting klines data.
-	requestEndpoint("klines", &qy, &jn)
+	// Get candles.
+	getEndpoint("klines", &qy, &jn)
 
 	// Parse candles.
 	for _, r := range jn {
@@ -218,11 +215,11 @@ func candlesSlice(from time.Time, symbol string) []Candle {
 	return ce
 }
 
-// Receives via function "candlesSlice" candles and in new loop shift time to the end of the slice from previous loop.
-func candlesLoops(from time.Time, symbol string, loop func(candles []Candle)) {
+// Receives via function "getCandles" candles and in new loop shift time to the end of the slice from previous loop.
+func receiveCandles(from time.Time, symbol string, loop func(candles []Candle)) {
 
 	// In every new loop shift time to the end of the slice from previous loop.
-	for cs := candlesSlice(from, symbol); len(cs) > 0; cs = candlesSlice(cs[len(cs)-1].Time.Truncate(time.Minute).Add(time.Minute), symbol) {
+	for cs := getCandles(from, symbol); len(cs) > 0; cs = getCandles(cs[len(cs)-1].Time.Truncate(time.Minute).Add(time.Minute), symbol) {
 
 		cl := len(cs)
 
@@ -235,11 +232,11 @@ func candlesLoops(from time.Time, symbol string, loop func(candles []Candle)) {
 	}
 }
 
-// Receives candles via function "candlesLoops" and save to database.
-func candlesSaveIntoDatabase(from time.Time, symbol string) {
+// Receives candles via function "receiveCandles" and save to database.
+func saveCandles(from time.Time, symbol string) {
 
 	// Receive candles.
-	candlesLoops(from, symbol, func(ce []Candle) {
+	receiveCandles(from, symbol, func(ce []Candle) {
 
 		// Prepared data to be inserted into the database.
 		da := make([]any, 0)
@@ -277,7 +274,7 @@ func candlesSaveIntoDatabase(from time.Time, symbol string) {
 			}
 		}
 
-		// Inserting klines to database.
+		// Inserting candles to database.
 		if r, e := binance.database.Exec(qy, da...); e != nil {
 			log.Fatal(e, r)
 		}
@@ -319,17 +316,17 @@ func candleTimeOfLastSaved(symbol string) (time.Time, bool) {
 }
 
 // Actualize candles in database via function: candlesSaveIntoDatabase.
-func candlesUpdateIntoDatabase(from time.Time, symbol string) {
+func updateCandles(from time.Time, symbol string) {
 
 	if t, b := candleTimeOfLastSaved(symbol); b {
 		from = t.Add(time.Minute)
 	}
 
-	candlesSaveIntoDatabase(from, symbol)
+	saveCandles(from, symbol)
 }
 
 // Selected candles from database and returns their in array.
-func candlesFromDatabase(from time.Time, symbol string) []Candle {
+func selectCandles(from time.Time, symbol string) []Candle {
 
 	var pc []Candle // Prepared candles for returns.
 	var ce Candle   // Candle for scan the database.
