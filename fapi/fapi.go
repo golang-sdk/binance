@@ -29,6 +29,12 @@ import (
 	_ "github.com/go-sql-driver/mysql"
 )
 
+type symbol struct {
+	name  string     // Symbol.
+	table string     // Table name.
+	last  *time.Time // Time of last update into database.
+}
+
 // Binance API.
 var binance struct {
 
@@ -40,6 +46,9 @@ var binance struct {
 
 	// Binance API key.
 	key string
+
+	// Listened symbols.
+	symbols map[string]*symbol
 
 	// Used weight.
 	weight struct {
@@ -58,10 +67,19 @@ var binance struct {
 // Initialize default values for connect API, prepare and ping connect to database.
 func Init(key, user, password, host, database string) {
 
+	// Binance API key.
 	binance.key = key
+
+	// HTTP client for all request to Binance API.
 	binance.client = &http.Client{Timeout: time.Minute}
 
+	// Initialize map with symbols.
+	binance.symbols = make(map[string]*symbol)
+
+	// Initialize value.
 	binance.weight.last = time.Now().UTC()
+
+	// Temporary value.
 	binance.weight.maximum = 1200
 
 	if d, e := sql.Open("mysql",
@@ -80,6 +98,26 @@ func Init(key, user, password, host, database string) {
 
 	if e := binance.database.Ping(); e != nil {
 		log.Fatalf("Error %s when ping to MySql database.", e)
+	}
+
+	// Get from database the table names contain chandles.
+	if r, e := binance.database.Query(fmt.Sprintf(`SHOW TABLES FROM %s LIKE 'fc_%%'`, database)); e == nil {
+
+		var t string // Table name.
+
+		defer r.Close()
+
+		for r.Next() {
+
+			if e := r.Scan(&t); e != nil {
+				log.Fatalln(e)
+			}
+
+			binance.symbols[strings.ToUpper(t[3:])] = &symbol{strings.ToUpper(t[3:]), t, nil}
+		}
+
+	} else {
+		log.Fatalln(e)
 	}
 }
 
