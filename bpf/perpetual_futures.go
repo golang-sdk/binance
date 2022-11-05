@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package fapi
+package bpf
 
 import (
 	"database/sql"
@@ -29,9 +29,22 @@ import (
 	_ "github.com/go-sql-driver/mysql"
 )
 
+type Candle struct {
+	Time      time.Time // Open time.
+	Open      float64   // Open price.
+	High      float64   // High price.
+	Low       float64   // Low price.
+	Close     float64   // Close price.
+	Number    uint64    // Number of trades.
+	Quantity  float64   // Total trading volume of the coin.
+	Purchases float64   // Volume in coins purchased by the taker.
+	Asset     float64   // Total trading volume in fiat.
+	Sales     float64   // Volume in fiat sales by the taker.
+}
+
 type symbol struct {
-	name  string     // Symbol.
-	table string     // Table name.
+	name  string     // The symbol name.
+	table string     // The table name.
 	last  *time.Time // Time of last update into database.
 }
 
@@ -210,6 +223,32 @@ func getCandles(from time.Time, symbol string) []Candle {
 
 	var jn [][]any  // Unparsed candles.
 	var ce []Candle // Parsed candles.
+	var oc int64    // Timestamp open candle.
+	var nt uint64   // Number of trades.
+
+	// Convert any string to float.
+	af := func(v any) float64 {
+
+		var s string
+
+		b, e := json.Marshal(v)
+
+		if e != nil {
+			log.Fatalln(e)
+		}
+
+		if e := json.Unmarshal(b, &s); e != nil {
+			log.Fatalln(e)
+		}
+
+		f, e := strconv.ParseFloat(s, 64)
+
+		if e != nil {
+			log.Fatalln(e)
+		}
+
+		return f
+	}
 
 	// Queries.
 	qy := map[string]string{
@@ -227,17 +266,37 @@ func getCandles(from time.Time, symbol string) []Candle {
 
 		if len(r) == 12 {
 
+			// Parse open time.
+			if b, e := json.Marshal(r[0]); e == nil {
+
+				if e := json.Unmarshal(b, &oc); e != nil {
+					log.Fatalln(e)
+				}
+			} else {
+				log.Fatal(e)
+			}
+
+			// Parse number of trades.
+			if b, e := json.Marshal(r[8]); e == nil {
+
+				if e := json.Unmarshal(b, &nt); e != nil {
+					log.Fatalln(e)
+				}
+			} else {
+				log.Fatal(e)
+			}
+
 			ce = append(ce, Candle{
-				Time:      time.UnixMilli(convertAnyToInt(r[0])).UTC(),     // Open time.
-				Open:      convertStringToFloat(convertAnyToString(r[1])),  // Open price.
-				High:      convertStringToFloat(convertAnyToString(r[2])),  // High price.
-				Low:       convertStringToFloat(convertAnyToString(r[3])),  // Low price.
-				Close:     convertStringToFloat(convertAnyToString(r[4])),  // Close price.
-				Number:    convertAnyToUint(r[8]),                          // Number of trades.
-				Quantity:  convertStringToFloat(convertAnyToString(r[5])),  // Volume.
-				Purchases: convertStringToFloat(convertAnyToString(r[9])),  // Taker buy base asset volume.
-				Asset:     convertStringToFloat(convertAnyToString(r[7])),  // Quote asset volume.
-				Sales:     convertStringToFloat(convertAnyToString(r[10])), // Taker buy quote asset volume.
+				Time:      time.UnixMilli(oc).UTC(), // Open time.
+				Open:      af(r[1]),                 // Open price.
+				High:      af(r[2]),                 // High price.
+				Low:       af(r[3]),                 // Low price.
+				Close:     af(r[4]),                 // Close price.
+				Number:    nt,                       // Number of trades.
+				Quantity:  af(r[5]),                 // Volume.
+				Purchases: af(r[9]),                 // Taker buy base asset volume.
+				Asset:     af(r[7]),                 // Quote asset volume.
+				Sales:     af(r[10]),                // Taker buy quote asset volume.
 			})
 
 		} else {
@@ -403,4 +462,25 @@ func selectCandles(from time.Time, symbol string) []Candle {
 	}
 
 	return pc
+}
+
+func Run() {
+
+	// tttt := binance.table("BTCUSDT")
+
+	aaaa, ftt := binance.symbols["BTCUSDTr"]
+
+	if ftt {
+		dsvbsb := aaaa.name
+		fmt.Println("dfb:", dsvbsb)
+	}
+
+	// binance.testff()
+
+	// selectCandles(time.Date(2022, time.November, 1, 12, 0, 0, 0, time.UTC), "BTCUSDT")
+
+	// fdb("BTCUSDT")
+
+	// candlesUpdateIntoDatabase(time.Date(2022, time.January, 30, 21, 30, 0, 0, time.UTC), "BTCUSDT")
+
 }
