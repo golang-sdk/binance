@@ -463,24 +463,3 @@ func selectCandles(from time.Time, symbol string) []Candle {
 
 	return pc
 }
-
-func Run() {
-
-	// tttt := binance.table("BTCUSDT")
-
-	aaaa, ftt := binance.symbols["BTCUSDTr"]
-
-	if ftt {
-		dsvbsb := aaaa.name
-		fmt.Println("dfb:", dsvbsb)
-	}
-
-	// binance.testff()
-
-	// selectCandles(time.Date(2022, time.November, 1, 12, 0, 0, 0, time.UTC), "BTCUSDT")
-
-	// fdb("BTCUSDT")
-
-	// candlesUpdateIntoDatabase(time.Date(2022, time.January, 30, 21, 30, 0, 0, time.UTC), "BTCUSDT")
-
-}
